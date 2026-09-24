@@ -1,0 +1,59 @@
+on:
+  cli:
+    init:
+      commit-sha: ${{ event.git.sha }}
+  github:
+    push:
+      init:
+        commit-sha: ${{ event.git.sha }}
+    pull_request:
+      init:
+        commit-sha: ${{ event.git.sha }}
+
+base:
+  image: ubuntu:24.04
+  config: rwx/base 1.2.0
+
+tasks:
+  - key: code
+    call: git/clone 2.1.0
+    with:
+      repository: https://github.com/dscout-interview/devops-exercise.git
+      ref: ${{ init.commit-sha }}
+
+  - key: erlang
+    call: erlang/install 1.2.0
+    with:
+      erlang-version: "26.2.3"
+
+  - key: elixir
+    use: erlang
+    call: elixir-lang/install 1.2.0
+    with:
+      elixir-version: "1.17.2"
+
+  - key: elixir-dependencies
+    use: [code, elixir]
+    run: cd apps/elixscout && mix deps.get
+    filter:
+      - apps/elixscout/mix.exs
+      - apps/elixscout/mix.lock
+
+  - key: elixir-test
+    use: elixir-dependencies
+    run: cd apps/elixscout && mix test
+
+  - key: python
+    call: python/install 2.0.1
+    with:
+      python-version: "3.12.2"
+
+  - key: python-dependencies
+    use: [code, python]
+    run: python -m pip install -r apps/pyscout/requirements.txt
+    filter:
+      - apps/pyscout/requirements.txt
+
+  - key: python-test
+    use: python-dependencies
+    run: cd apps/pyscout && python -m pytest -q
